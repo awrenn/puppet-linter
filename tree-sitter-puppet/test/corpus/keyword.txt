@@ -1,0 +1,10 @@
+==================
+Include Basic
+==================
+
+include foobar
+
+---
+
+(source_file
+  (include (identifier)))

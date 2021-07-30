@@ -1,0 +1,4 @@
+
+> tree-sitter-puppet@1.0.0 parse
+> tree-sitter generate && tree-sitter parse ./test/test.pp
+

@@ -1,0 +1,47 @@
+=========
+Basic if
+=========
+
+if $foo {
+
+}
+
+---
+(source_file
+  (if_statement
+    (if_block 
+      (identifier))))
+
+==============
+Basic if else
+==============
+
+if $foo {
+
+} else {
+
+}
+
+---
+(source_file
+  (if_statement
+    (if_block
+        (identifier))
+    (else_block)))
+
+===========
+Basic case
+===========
+
+case $foo {
+    'bar': {}
+} 
+
+---
+
+(source_file
+  (case_statement
+    (identifier)
+    (case_block
+      (string))))
+
