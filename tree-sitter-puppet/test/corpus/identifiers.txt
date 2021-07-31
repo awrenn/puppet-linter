@@ -25,6 +25,6 @@ File['foo'] {
 (source_file
   (resource_declaration
     (type
-      (capital_identifier))
-    (index
-      (string))))
+      (capital_identifier)
+      (index
+        (string)))))

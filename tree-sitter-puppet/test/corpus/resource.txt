@@ -150,7 +150,117 @@ exec { 'make dhkey web':
       (resource_config
         (string)
         (resource_attribute
+          (identifier)
           (type
-            (capital_identifier))
-          (index
-            (identifier)))))))
+            (capital_identifier)
+            (index
+              (identifier))))))))
+
+================================================================================
+Resource + Type Extra
+================================================================================
+
+exec { 'make dhkey web':
+  require => File::Bonus["foo", "bar"],
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (resource_declaration
+    (identifier)
+    (resource_block
+      (resource_config
+        (string)
+        (resource_attribute
+          (identifier)
+          (type
+            (capital_identifier)
+            (index
+              (string)
+              (string))))))))
+
+================================================================================
+Resource RePro
+================================================================================
+
+class profile::boot::pxe::web(
+  String[1] $canonical_fqdn = $facts['networking']['fqdn'],
+  String[1] $www_root = '/webroot'
+) {}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (class_definition
+    (identifier)
+    (standard_parameter_list
+      (parameter_list
+        (parameter
+          (type
+            (capital_identifier)
+            (index
+              (integer)))
+          (identifier)
+          (default_param_value
+            (identifier)
+            (index
+              (string))
+            (index
+              (string))))
+        (parameter
+          (type
+            (capital_identifier)
+            (index
+              (integer)))
+          (identifier)
+          (default_param_value
+            (string)))))
+    (class_definition_block)))
+
+================================================================================
+Mode Resource
+================================================================================
+  File {
+    mode    => '0640',
+    owner   => 'root',
+    group   => 'pkg5srv',
+  }
+--------------------------------------------------------------------------------
+
+(source_file
+  (resource_declaration
+    (type
+      (capital_identifier))
+    (resource_block
+      (resource_attribute
+        (identifier)
+        (string))
+      (resource_attribute
+        (identifier)
+        (string))
+      (resource_attribute
+        (identifier)
+        (string)))))
+
+================================================================================
+Default attribute
+================================================================================
+
+  ssh_authorized_key {
+    default:
+      user    => 'root',
+    ;
+ }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (resource_declaration
+    (identifier)
+    (resource_block
+      (resource_config
+        (identifier)
+        (resource_attribute
+          (identifier)
+          (string))))))

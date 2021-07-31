@@ -1,20 +1,20 @@
-==================
+================================================================================
 Class Definition
-==================
+================================================================================
 
 class profile::kerminator {
 }
 
----
+--------------------------------------------------------------------------------
 
 (source_file
   (class_definition
     (identifier)
     (class_definition_block)))
 
-==================
+================================================================================
 Class Definition Nested
-==================
+================================================================================
 
 class profile::kerminator {
   class profile::kerminator::triple {
@@ -22,19 +22,19 @@ class profile::kerminator {
   }
 }
 
----
+--------------------------------------------------------------------------------
 
 (source_file
   (class_definition
     (identifier)
     (class_definition_block
-      (class_definition 
+      (class_definition
         (identifier)
         (class_definition_block)))))
 
-==================
+================================================================================
 Class Definition Nested Resource
-==================
+================================================================================
 
 class profile::kerminator {
   class { 'profile::kerminator::triple': 
@@ -42,20 +42,20 @@ class profile::kerminator {
   }
 }
 
----
+--------------------------------------------------------------------------------
 
-(source_file 
-  (class_definition 
-    (identifier) 
-    (class_definition_block 
-      (resource_declaration 
-        (resource_block 
-          (resource_config 
+(source_file
+  (class_definition
+    (identifier)
+    (class_definition_block
+      (resource_declaration
+        (resource_block
+          (resource_config
             (string)))))))
 
-==================
+================================================================================
 Class Definition - Parameters
-==================
+================================================================================
 
 
 class profile::kerminator (
@@ -63,21 +63,22 @@ class profile::kerminator (
 ){
 }
 
----
+--------------------------------------------------------------------------------
 
 (source_file
   (class_definition
     (identifier)
-    (standard_parameter_list 
-      (parameter_list 
-          (parameter
-              (type (capital_identifier)) 
-              (identifier))))
-      (class_definition_block)))
+    (standard_parameter_list
+      (parameter_list
+        (parameter
+          (type
+            (capital_identifier))
+          (identifier))))
+    (class_definition_block)))
 
-==================
+================================================================================
 Class Definition - Parameters - Default
-==================
+================================================================================
 
 
 class profile::kerminator (
@@ -85,17 +86,100 @@ class profile::kerminator (
 ){
 }
 
----
+--------------------------------------------------------------------------------
 
 (source_file
   (class_definition
     (identifier)
-    (standard_parameter_list 
-      (parameter_list 
-          (parameter
-              (type (capital_identifier)) 
-              (identifier)
-              (default_param_value (bool)))))
+    (standard_parameter_list
+      (parameter_list
+        (parameter
+          (type
+            (capital_identifier))
+          (identifier)
+          (default_param_value
+            (bool)))))
     (class_definition_block)))
 
+================================================================================
+Class Definition no type
+================================================================================
 
+class profile::postgresql::firewall (
+  $postgres_port = '5432',
+  $allow_range   = undef,
+) {
+  include profile::server::params
+
+  if $allow_range == undef {
+    firewall { '103 allow postgres':
+      proto  => 'tcp',
+      action => 'accept',
+      dport  => $postgres_port,
+    }
+  }
+  else {
+    firewall { '103 allow postgres':
+      proto  => 'tcp',
+      action => 'accept',
+      dport  => $postgres_port,
+      source => $allow_range,
+    }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (class_definition
+    (identifier)
+    (standard_parameter_list
+      (parameter_list
+        (parameter
+          (identifier)
+          (default_param_value
+            (string)))
+        (parameter
+          (identifier)
+          (default_param_value
+            (undef)))))
+    (class_definition_block
+      (include
+        (identifier))
+      (if_statement
+        (if_block
+          (binary_expression
+            (identifier)
+            (undef))
+          (resource_declaration
+            (identifier)
+            (resource_block
+              (resource_config
+                (string)
+                (resource_attribute
+                  (identifier)
+                  (string))
+                (resource_attribute
+                  (identifier)
+                  (string))
+                (resource_attribute
+                  (identifier)
+                  (identifier))))))
+        (else_block
+          (resource_declaration
+            (identifier)
+            (resource_block
+              (resource_config
+                (string)
+                (resource_attribute
+                  (identifier)
+                  (string))
+                (resource_attribute
+                  (identifier)
+                  (string))
+                (resource_attribute
+                  (identifier)
+                  (identifier))
+                (resource_attribute
+                  (identifier)
+                  (identifier))))))))))

@@ -57,8 +57,7 @@ $var = 100
 (source_file
   (binary_expression
     (identifier)
-    (number
-      (integer))))
+    (integer)))
 
 ================================================================================
 Value Definitions - Other
@@ -244,7 +243,33 @@ foo { "bar":
         (resource_attribute
           (identifier)
           (type
-            (capital_identifier))
-          (index
-            (number
+            (capital_identifier)
+            (index
               (integer))))))))
+
+================================================================================
+Value debug
+================================================================================
+
+  cron { 'mesos failsafe cleanup':
+    command => "/usr/bin/find ${work_dir}/slaves/*/*/*/executors/ -mtime +8 -delete",
+    hour    => 1,
+  }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (resource_declaration
+    (identifier)
+    (resource_block
+      (resource_config
+        (string)
+        (resource_attribute
+          (identifier)
+          (string
+            (interpolation_expression
+              (interpolation_identifier
+                (identifier)))))
+        (resource_attribute
+          (identifier)
+          (integer))))))

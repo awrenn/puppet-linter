@@ -13,6 +13,7 @@ const PREC = {
     or: 3,
     assignment: -1,
     ordering: -2,
+    rocket: -3, // This can't override hash literal syntax
   },
   not_operators = ["!"],
   negation_operators = ["-"],
@@ -24,45 +25,57 @@ const PREC = {
   shift_operators = ["<<", ">>"],
   equality_operators = ["==", "!="],
   comparative_operators = ["<", "<=", ">", ">="],
+  rocket_operators = ["=>"],
   and = ["and"],
   or = ["or"],
   assignment_operators = ["="],
-  ordering_operators = ["->", "~>"];
-//keywords = [
-//  "and",
-//  "application",
-//  "attr",
-//  "case",
-//  "component",
-//  "consumes",
-//  "default",
-//  "define",
-//  "elsif",
-//  "environment",
-//  "false",
-//  "function",
-//  "if",
-//  "import",
-//  "in",
-//  "inherits",
-//  "node",
-//  "or",
-//  "private",
-//  "produces",
-//  "regexp",
-//  "site",
-//  "true",
-//  "undef",
-//  "unit",
-//  "unless",
-//];
+  ordering_operators = ["->", "~>"],
+  keywords = [
+    "and",
+    "application",
+    "attr",
+    "case",
+    "component",
+    "consumes",
+    "default",
+    "define",
+    "elsif",
+    "environment",
+    "false",
+    "function",
+    "if",
+    "import",
+    "in",
+    "inherits",
+    "node",
+    "or",
+    "private",
+    "produces",
+    "regexp",
+    "site",
+    "true",
+    "undef",
+    "unit",
+    "unless",
+  ];
 
 module.exports = grammar({
   name: "puppet",
 
+  conflicts: ($) => [
+    [$.case_statement, $._resource_declaration],
+    [$.if_block, $._resource_declaration],
+    [$.elsif_block, $._resource_declaration],
+    [$.else_block, $._resource_declaration],
+    [$.interpolation_identifier, $._value],
+    [$._interpolation_value, $._value],
+    [$._interpolation_expression, $._expression],
+  ],
+
   externals: ($) => [
     $._heredoc_header,
     $.heredoc_trim_border,
+    $.heredoc_body,
     $._heredoc_end,
     $._heredoc_end_trim,
   ],
@@ -77,24 +90,28 @@ module.exports = grammar({
     _statement: ($) =>
       prec.right(choice($._expression, $.resource_declaration)),
 
-    //keyword: ($) => choice(...keywords),
+    keyword: ($) => token(choice(...keywords)),
 
     identifier: ($) =>
       token(
         choice(
           seq(
-            optional("$"),
-            repeat(seq(/[a-z_][a-z0-9_]*/, token.immediate("::"))),
-            /[a-z_][a-z0-9_]*/
+            optional(choice("$", repeat1("@"))),
+            optional(token.immediate("::")),
+            repeat(seq(/[a-z_][a-zA-Z0-9_]*/, token.immediate("::"))),
+            /[a-z_][a-zA-Z0-9_]*/
           )
         )
       ),
+
+    interpolation_identifier: ($) => choice($.identifier, $.keyword),
+
     immediate_identifier: ($) =>
       token.immediate(
         seq(
           optional("$"),
           optional(/[a-z_][a-z0-9_]*/),
-          repeat(seq(token.immediate("::"), /[a-z_][a-z0-9_]*a/)),
+          repeat(seq(token.immediate("::"), /[a-z_][a-z0-9_]*/)),
           /[a-z_][a-z0-9_]*/
         )
       ),
@@ -108,7 +125,13 @@ module.exports = grammar({
       ),
 
     capital_identifier: ($) =>
-      token(seq(/[A-Z]/, token.immediate(/[a-zA-Z_][a-zA-Z0-9_]*/))),
+      token(
+        seq(
+          optional("::"),
+          token.immediate(repeat(seq(/[A-Z][a-zA-Z0-9_]*/, "::"))),
+          /[A-Z][a-zA-Z0-9_]*/
+        )
+      ),
 
     var_identifier: ($) =>
       token(
@@ -134,45 +157,42 @@ module.exports = grammar({
         )
       ),
 
-    _resource_title: ($) => choice($.string, $.identifier),
-    type: ($) =>
-      prec.right(
-        seq(
-          $.capital_identifier,
-          optional(
-            seq(
-              "[",
-              choice(
-                $.type,
-                seq(
-                  $._resource_title,
-                  repeat(seq(",", $._resource_title)),
-                  optional($._resource_title)
-                )
-              ),
-              "]"
-            )
-          )
-        )
-      ),
+    _resource_title: ($) => $._value,
+    type: ($) => prec.right(seq($.capital_identifier, optional($.index))),
 
-    number: ($) => choice($.integer),
+    _number: ($) =>
+      choice(
+        $.integer,
+        $.octal,
+        $.hex_upper,
+        $.hex_lower,
+        $.floating_point,
+        $.exp_float
+      ),
     integer: ($) => /[0-9]+/,
 
+    floating_point: ($) =>
+      token(seq(/[0-9]+/, token.immediate("."), token.immediate(/[0-9]+/))),
+    exp_float: ($) =>
+      token(seq(/[0-9]+/, token.immediate("e"), token.immediate(/[0-9]+/))),
+    octal: ($) => token(seq("0o", token.immediate(/[0-8]+/))),
+    hex_lower: ($) => token(seq("0x", token.immediate(/[0-9a-fA-F]+/))),
+    hex_upper: ($) => token(seq("0X", token.immediate(/[0-9a-fA-F]+/))),
+
     interpolation_expression: ($) =>
-      choice(seq("${", choice($._expression), "}")),
+      choice(seq("${", choice($._interpolation_expression), "}")),
 
     _string_body: ($) =>
       repeat1(
         choice(
           $.interpolation_expression,
           /\$[^{]/,
-          token.immediate(/[^"\n\\$|]+/),
+          token.immediate(/[^"\\$]+/),
           $.escape_sequence
         )
       ),
     _fixed_string_body: ($) =>
-      repeat1(choice(token.immediate(/[^'\n\\|]+/), $.escape_sequence)),
+      repeat1(choice(token.immediate(/[^'\\]+/), $.escape_sequence)),
 
     string: ($) =>
       choice(
@@ -185,7 +205,7 @@ module.exports = grammar({
         prec.left(
           seq(
             "/",
-            repeat(choice(token.immediate(/./), token.immediate("\\/"))),
+            repeat(choice(token.immediate(/[^\/\n]/), token.immediate("\\/"))),
             "/"
           )
         )
@@ -212,25 +232,56 @@ module.exports = grammar({
     bool: ($) => choice("true", "false"),
     undef: ($) => "undef",
 
+    // This syntax is...
+    // Keywords can only be used as identifiers in an interpolation context
+    // TODO acwrenn
+    // We need to replace all the expression components with ones where we can use keywords as identifiers
+    _interpolation_expression: ($) =>
+      prec.right(
+        choice(
+          prec(
+            3,
+            seq($._interpolation_expression, choice($.call, $.field, $.index))
+          ),
+          prec.right(
+            1,
+            choice(
+              $.binary_expression,
+              $._interpolation_value,
+              $._wrapped_expression,
+              $.include,
+              $.case_statement,
+              $.if_statement,
+              $.unless_statement,
+              $.unary_expression,
+              $._heredoc,
+              $.class_definition,
+              $.resource_collector,
+              $.exported_resource_collector
+            )
+          )
+        )
+      ),
+
     _expression: ($) =>
       prec.right(
         choice(
-          prec(2, seq($._expression, choice($.call, $.field, $.index))),
-          prec(
+          prec(3, seq($._expression, choice($.call, $.field, $.index))),
+          prec.right(
             1,
-            seq(
-              choice(
-                $._value,
-                $._wrapped_expression,
-                $.binary_expression,
-                $.include,
-                $.case_statement,
-                $.if_statement,
-                $.unary_expression,
-                $._heredoc,
-                $.class_definition,
-                $.resource_collector
-              )
+            choice(
+              $.binary_expression,
+              $._value,
+              $._wrapped_expression,
+              $.include,
+              $.case_statement,
+              $.if_statement,
+              $.unless_statement,
+              $.unary_expression,
+              $._heredoc,
+              $.class_definition,
+              $.resource_collector,
+              $.exported_resource_collector
             )
           )
         )
@@ -239,7 +290,7 @@ module.exports = grammar({
     _wrapped_expression: ($) => seq("(", $._statement, ")"),
 
     _resource_binary_expression: ($) =>
-      prec.left(
+      prec.right(
         PREC.ordering,
         seq($._statement, choice(...ordering_operators), $._statement)
       ),
@@ -255,6 +306,7 @@ module.exports = grammar({
         [PREC.comparative, choice(...comparative_operators)],
         [PREC.and, choice(...and)],
         [PREC.or, choice(...or)],
+        [PREC.rocket, choice(...rocket_operators)],
         [PREC.assignment, choice(...assignment_operators)],
       ];
 
@@ -265,7 +317,7 @@ module.exports = grammar({
             seq(
               field("left", $._expression),
               field("operator", operator),
-              field("right", $._statement)
+              field("right", $._expression)
             )
           )
         )
@@ -291,29 +343,56 @@ module.exports = grammar({
       );
     },
 
-    index: ($) => prec.left(seq(token.immediate("["), $._expression, "]")),
+    index: ($) =>
+      prec.left(
+        seq(
+          token.immediate("["),
+          repeat(seq($._expression, ",")),
+          $._expression,
+          optional(","),
+          "]"
+        )
+      ),
 
     field: ($) => prec.left(seq(".", $.immediate_identifier)),
 
     question_switch: ($) => seq($._expression, "?", $.hash),
 
-    // Attempt to parse _values first,
-    // before other objects
-    _value: ($) =>
-      choice(
-        $.number,
-        $.string,
-        $.bool,
-        $.undef,
-        $.regex,
-        $.array,
-        $.hash,
-        $.question_switch,
-        $.type,
-        $.identifier
+    // I'll say it again - string interpolation syntax is not fun here.
+    // Exactly the same, but we can use keywords as identifiers
+    _interpolation_value: ($) =>
+      prec.right(
+        choice(
+          $._number,
+          $.string,
+          $.bool,
+          $.undef,
+          $.regex,
+          $.array,
+          $.hash,
+          $.question_switch,
+          $.type,
+          $.interpolation_identifier
+        )
       ),
 
-    default_param_value: ($) => seq("=", prec(3, $._expression)),
+    _value: ($) =>
+      prec.right(
+        choice(
+          $._number,
+          $.string,
+          $.bool,
+          $.undef,
+          $.regex,
+          $.array,
+          $.hash,
+          $.question_switch,
+          $.type,
+          $.identifier
+        )
+      ),
+
+    default_param_value: ($) => seq("=", prec(4, $._expression)),
     parameter: ($) =>
       seq(optional($.type), $.identifier, optional($.default_param_value)),
 
@@ -325,34 +404,39 @@ module.exports = grammar({
     class_definition_block: ($) =>
       seq("{", repeat(prec.right($._statement)), "}"),
 
+    inherits_statement: ($) => seq("inherits", $.identifier),
+
     class_definition: ($) =>
       seq(
-        // Multiple different key words can use the class-style defintion
         field("type", choice("class", "define")),
-        seq(
-          $.identifier,
-          optional($.standard_parameter_list),
-          $.class_definition_block
-        )
+        $.identifier,
+        optional($.standard_parameter_list),
+        optional($.inherits_statement),
+        $.class_definition_block
       ),
 
     resource_attribute: ($) =>
       seq(
-        field("key", choice("default", "*", "require", $.identifier)),
-        "=>",
+        field("key", choice("*", $.identifier)),
+        field("operator", choice("=>", "+>")), // surprise operator
         field("value", $._expression),
         optional(",")
       ),
     resource_config: ($) =>
       seq($._expression, ":", repeat($.resource_attribute)),
     resource_block: ($) =>
-      choice($.resource_config, repeat1(seq($.resource_config, ";"))),
+      choice(
+        repeat1($.resource_attribute),
+        seq(
+          repeat(seq($.resource_config, ";")),
+          $.resource_config,
+          optional(";")
+        )
+      ),
 
     _resource_declaration: ($) =>
       prec.right(
-        2,
         seq(
-          // check to see if its a resource ref first
           choice($._expression, $.type, "class"),
           seq("{", optional($.resource_block), "}")
         )
@@ -405,7 +489,10 @@ module.exports = grammar({
       seq(
         field("field", $.identifier),
         field("operator", choice($.eq, $.ne)),
-        field("key", choice($.string, $.bool, $.number, $.type, $.undef))
+        field(
+          "key",
+          choice($.string, $.bool, $._number, $.type, $.undef, $.identifier)
+        )
       ),
     collector_expression: ($) =>
       prec.right(
@@ -418,24 +505,58 @@ module.exports = grammar({
           $.collector_match_expression
         )
       ),
-    resource_collector: ($) => seq($.type, "<|", $.collector_expression, "|>"),
-    _comment: ($) => token(/#[^\n]*/),
+    exported_resource_collector: ($) =>
+      seq($.type, "<<|", optional($.collector_expression), "|>>"),
+    resource_collector: ($) =>
+      seq($.type, "<|", optional($.collector_expression), "|>"),
+    _comment: ($) => token(prec(-10, /#[^\n]*/)),
 
-    //_if_block: ($) => seq("{", repeat(prec.right($._expression)), "}"),
-    _if_block: ($) => seq("{", repeat($._statement), "}"),
+    // Take if and elsif blocks over resource definitions
+    if_block: ($) =>
+      prec.right(10, seq("if", $._expression, "{", repeat($._statement), "}")),
+    elsif_block: ($) =>
+      prec.right(
+        10,
+        seq("elsif", $._expression, "{", repeat($._statement), "}")
+      ),
+    else_block: ($) =>
+      prec.right(10, seq("else", "{", repeat($._statement), "}")),
 
-    if_block: ($) => seq("if", $._expression, $._if_block),
-    else_block: ($) => seq("else", $._if_block),
+    if_statement: ($) =>
+      prec.right(
+        seq($.if_block, repeat($.elsif_block), optional($.else_block))
+      ),
 
-    if_statement: ($) => seq($.if_block, optional($.else_block)),
+    unless_block: ($) =>
+      prec.right(
+        10,
+        seq("unless", $._expression, "{", repeat($._statement), "}")
+      ),
 
-    case_block: ($) => seq($._expression, ":", "{", repeat($._statement), "}"),
+    unless_statement: ($) => seq($.unless_block, optional($.else_block)),
 
     case_statement: ($) =>
-      seq("case", $._expression, "{", repeat($.case_block), "}"),
+      prec.right(
+        seq(
+          "case",
+          $._expression,
+          "{",
+          repeat(
+            seq(
+              field(
+                "case_match_expressions",
+                seq(repeat(seq($._expression, ",")), $._expression)
+              ),
+              ":",
+              "{",
+              field("case_block", repeat($._statement)),
+              "}"
+            )
+          ),
+          "}"
+        )
+      ),
 
-    heredoc_body: ($) => $._string_body,
-    heredoc_fixed_body: ($) => $._string_body,
     heredoc_switches: ($) =>
       seq("/", repeat(choice("$", "n", "r", "t", "s", "L", "u"))),
     heredoc_syntax: ($) => seq(":", /[^)]+/),
@@ -449,6 +570,7 @@ module.exports = grammar({
         optional(choice($.heredoc_switches, $.heredoc_syntax)),
         ")",
         optional($.heredoc_body),
+        $.heredoc_trim_border,
         choice($._heredoc_end, $._heredoc_end_trim)
       ),
 
@@ -458,9 +580,9 @@ module.exports = grammar({
         $._heredoc_header,
         optional(choice($.heredoc_switches, $.heredoc_syntax)),
         ")",
-        optional($.heredoc_fixed_body),
+        optional($.heredoc_body),
         $.heredoc_trim_border,
-        $._heredoc_end
+        choice($._heredoc_end, $._heredoc_end_trim)
       ),
 
     _heredoc: ($) => choice($.heredoc_fixed, $.heredoc_interpolate),
